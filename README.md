@@ -1,45 +1,104 @@
-# Data-Cleaning-Project-using-SQL
+# Data Cleaning and Standardization
 
-## Cleaning Data in SQL Queries
+## Overview
+This set of SQL queries aims to clean and standardize the data within the `PortfolioProject.NashvilleHousing` table. The cleaning process includes standardizing date formats, handling missing and inconsistent property addresses, breaking down address fields into individual components, transforming categorical values, removing duplicates, and finally, deleting unnecessary columns. These steps ensure the dataset's consistency and prepare it for meaningful analysis and reporting.
 
-## Objective
-The purpose of this SQL script is to clean and standardize the data within the `PortfolioProject.dbo.NashvilleHousing` table. The cleaning process involves various tasks, including standardizing date formats, populating missing property addresses, breaking down addresses into individual columns, transforming "Y" and "N" values to "Yes" and "No," removing duplicates, and finally, deleting unused columns. This ensures the dataset's consistency and enhances its usability for analysis and reporting.
+## Standardize Date Format
+The `SaleDate` column is converted to the correct date format (`'%Y-%m-%d'`). This standardizes the date representation for uniformity and consistency in data analysis.
 
-## Steps to Clean the Data
+```sql
+SELECT STR_TO_DATE(SaleDate, '%Y-%m-%d') as saleDateConverted
+FROM PortfolioProject.NashvilleHousing;
 
-### 1. **Standardize Date Format**
-   The script begins by standardizing the date format in the `SaleDate` column, ensuring uniformity for date-related analysis.
+UPDATE PortfolioProject.NashvilleHousing
+SET SaleDate = STR_TO_DATE(SaleDate, '%Y-%m-%d');
+```
 
-### 2. **Populate Property Address Data**
-   - Null property addresses are populated by matching records based on `ParcelID` and updating missing values from corresponding non-null records.
-   
-### 3. **Break Down Address Columns**
-   - The `PropertyAddress` column is divided into individual columns (`Address`, `City`, `State`) for improved granularity and ease of analysis.
+## Populate and Standardize Address Data
+### Populate Missing Property Addresses
+Missing `PropertyAddress` values are populated by matching records based on `ParcelID`.
 
-### 4. **Transform "Y" and "N" Values**
-   - The `SoldAsVacant` column values ("Y" and "N") are transformed to "Yes" and "No," respectively, for clarity and consistency.
+```sql
+UPDATE PortfolioProject.NashvilleHousing a
+JOIN PortfolioProject.NashvilleHousing b
+ON a.ParcelID = b.ParcelID
+AND a.UniqueID <> b.UniqueID
+SET a.PropertyAddress = IFNULL(a.PropertyAddress, b.PropertyAddress);
+```
 
-### 5. **Remove Duplicates**
-   - Duplicates are identified based on specific columns (`ParcelID`, `PropertyAddress`, `SalePrice`, `SaleDate`, `LegalReference`) and removed, ensuring a unique dataset.
+### Break Down Address Components
+`PropertyAddress` values are split into `PropertySplitAddress` and `PropertySplitCity` columns, providing individual components for analysis.
 
-### 6. **Delete Unused Columns**
-   - Unused columns (`OwnerAddress`, `TaxDistrict`, `PropertyAddress`, `SaleDate`) are removed from the table, streamlining the dataset for efficient storage and analysis.
+```sql
+ALTER TABLE PortfolioProject.NashvilleHousing
+ADD COLUMN PropertySplitAddress VARCHAR(255),
+ADD COLUMN PropertySplitCity VARCHAR(255);
+
+UPDATE PortfolioProject.NashvilleHousing
+SET PropertySplitAddress = SUBSTRING_INDEX(PropertyAddress, ',', 1),
+    PropertySplitCity = SUBSTRING_INDEX(SUBSTRING_INDEX(PropertyAddress, ',', -2), ',', 1);
+```
+
+## Standardize Owner Address Components
+`OwnerAddress` values are parsed and split into `OwnerSplitAddress`, `OwnerSplitCity`, and `OwnerSplitState` columns, ensuring consistent formatting and separation of address elements.
+
+```sql
+ALTER TABLE PortfolioProject.NashvilleHousing
+ADD COLUMN OwnerSplitAddress VARCHAR(255),
+ADD COLUMN OwnerSplitCity VARCHAR(255),
+ADD COLUMN OwnerSplitState VARCHAR(255);
+
+UPDATE PortfolioProject.NashvilleHousing
+SET OwnerSplitAddress = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 3),
+    OwnerSplitCity = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 2),
+    OwnerSplitState = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 1);
+```
+
+## Transform Categorical Values
+The `SoldAsVacant` column values ('Y' and 'N') are transformed to 'Yes' and 'No', respectively, for clarity and consistency.
+
+```sql
+UPDATE PortfolioProject.NashvilleHousing
+SET SoldAsVacant = CASE WHEN SoldAsVacant = 'Y' THEN 'Yes'
+                        WHEN SoldAsVacant = 'N' THEN 'No'
+                        ELSE SoldAsVacant END;
+```
+
+## Remove Duplicates
+Duplicates based on specific columns (`ParcelID`, `PropertyAddress`, `SalePrice`, `SaleDate`, `LegalReference`) are identified and removed, ensuring a unique dataset.
+
+```sql
+WITH RowNumCTE AS (
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY ParcelID, PropertyAddress, SalePrice, SaleDate, LegalReference ORDER BY UniqueID) as row_num
+    FROM PortfolioProject.NashvilleHousing
+)
+DELETE FROM RowNumCTE
+WHERE row_num > 1;
+```
+
+## Delete Unused Columns
+Unused columns (`OwnerAddress`, `TaxDistrict`, `PropertyAddress`, `SaleDate`) are removed, streamlining the dataset for efficient storage and analysis.
+
+```sql
+ALTER TABLE PortfolioProject.NashvilleHousing
+DROP COLUMN OwnerAddress, TaxDistrict, PropertyAddress, SaleDate;
+```
 
 ## Instructions for Use
 1. **Database Connection:**
    - Ensure you have appropriate database access and connection permissions.
-   - Execute the SQL script in a database management tool connected to the target database.
+   - Execute the SQL script in a database management tool connected to the target MySQL database.
 
 2. **Review and Modify:**
-   - Review the script to ensure compatibility with your database schema.
+   - Review the script to ensure compatibility with your MySQL database schema.
    - Modify table and column names if necessary to match your database structure.
 
 3. **Run the Script:**
-   - Execute the script in the database management tool to clean and standardize the data in the `PortfolioProject.dbo.NashvilleHousing` table.
+   - Execute the script in the database management tool to clean and standardize the data in the `PortfolioProject.NashvilleHousing` table.
 
 ## Conclusion
-This comprehensive cleaning process enhances the dataset's quality, making it reliable for subsequent analysis and reporting. The standardized format, populated missing values, transformed values, absence of duplicates, and removal of unnecessary columns contribute to a clean and organized dataset, facilitating meaningful insights and decision-making processes.
+This comprehensive data cleaning process enhances the dataset's quality, making it reliable for subsequent analysis and reporting. The standardized date formats, populated and consistent addresses, transformed categorical values, absence of duplicates, and removal of unnecessary columns contribute to a clean and organized dataset, facilitating meaningful insights and decision-making processes.
 
 ---
 
-*Disclaimer: The provided SQL script assumes a specific database schema. Please adjust column names, table names, and query logic as per your database structure and requirements.*
