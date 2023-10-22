@@ -1,8 +1,8 @@
 /*
-										REAL ESTATE HOUSING DATA CLEANING (MYSQL)
+									REAL ESTATE HOUSING DATA CLEANING (MYSQL)
 
 SQL skills used: date formatting with STR_TO_DATE, data population through UPDATE with JOIN and IFNULL, address component breakdown using SUBSTRING_INDEX, 
-    parsing and transformation with PARSENAME and CASE statements, duplicate removal with ROW_NUMBER() and DELETE, and column removal using DROP COLUMN.
+    transformation with CASE statements, duplicate identification with ROW_NUMBER(), and column removal using DROP COLUMN.
 
 
 */
@@ -34,7 +34,7 @@ JOIN PortfolioProject.NashvilleHousing b
 ON a.ParcelID = b.ParcelID
 AND a.UniqueID <> b.UniqueID
 SET a.PropertyAddress = IFNULL(a.PropertyAddress, b.PropertyAddress)
-WHERE a.PropertyAddress IS NULL;;
+WHERE a.PropertyAddress IS NULL;
 
 
 
