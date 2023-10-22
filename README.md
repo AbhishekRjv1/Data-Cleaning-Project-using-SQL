@@ -23,7 +23,8 @@ UPDATE PortfolioProject.NashvilleHousing a
 JOIN PortfolioProject.NashvilleHousing b
 ON a.ParcelID = b.ParcelID
 AND a.UniqueID <> b.UniqueID
-SET a.PropertyAddress = IFNULL(a.PropertyAddress, b.PropertyAddress);
+SET a.PropertyAddress = IFNULL(a.PropertyAddress, b.PropertyAddress)
+WHERE a.PropertyAddress IS NULL;
 ```
 
 ### Break Down Address Components
@@ -36,7 +37,7 @@ ADD COLUMN PropertySplitCity VARCHAR(255);
 
 UPDATE PortfolioProject.NashvilleHousing
 SET PropertySplitAddress = SUBSTRING_INDEX(PropertyAddress, ',', 1),
-    PropertySplitCity = SUBSTRING_INDEX(SUBSTRING_INDEX(PropertyAddress, ',', -2), ',', 1);
+    PropertySplitCity = SUBSTRING_INDEX(PropertyAddress, ',', -1);
 ```
 
 ## Standardize Owner Address Components
@@ -49,9 +50,9 @@ ADD COLUMN OwnerSplitCity VARCHAR(255),
 ADD COLUMN OwnerSplitState VARCHAR(255);
 
 UPDATE PortfolioProject.NashvilleHousing
-SET OwnerSplitAddress = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 3),
-    OwnerSplitCity = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 2),
-    OwnerSplitState = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 1);
+SET OwnerSplitAddress = SUBSTRING_INDEX(SUBSTRING_INDEX(OwnerAddress, ',', -3), ',', 1),
+    OwnerSplitCity = SUBSTRING_INDEX(SUBSTRING_INDEX(OwnerAddress, ',', -2), ',', 1),
+    OwnerSplitState = SUBSTRING_INDEX(SUBSTRING_INDEX(OwnerAddress, ',', -1), ',', 1);
 ```
 
 ## Transform Categorical Values
@@ -64,8 +65,8 @@ SET SoldAsVacant = CASE WHEN SoldAsVacant = 'Y' THEN 'Yes'
                         ELSE SoldAsVacant END;
 ```
 
-## Remove Duplicates
-Duplicates based on specific columns (`ParcelID`, `PropertyAddress`, `SalePrice`, `SaleDate`, `LegalReference`) are identified and removed, ensuring a unique dataset.
+## Show Duplicates Columns
+Duplicates based on specific columns (`ParcelID`, `PropertyAddress`, `SalePrice`, `SaleDate`, `LegalReference`) are identified and total count is taken, ensuring a unique dataset.
 
 ```sql
 WITH RowNumCTE AS (
@@ -73,8 +74,9 @@ WITH RowNumCTE AS (
            ROW_NUMBER() OVER (PARTITION BY ParcelID, PropertyAddress, SalePrice, SaleDate, LegalReference ORDER BY UniqueID) as row_num
     FROM PortfolioProject.NashvilleHousing
 )
-DELETE FROM RowNumCTE
-WHERE row_num > 1;
+select count(*) from PortfolioProject.NashvilleHousing
+where UniqueID in (select UniqueID FROM RowNumCTE WHERE row_num > 1)
+order by UniqueID;
 ```
 
 ## Delete Unused Columns
